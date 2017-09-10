@@ -8,17 +8,17 @@ from threading import Lock
 
 class ExchangeGateway:
     ############################################################################
-    # Static variable 
+    # Static variable
     # Applied on all gateways whether to record the timestamp in local machine,
     # rather than exchange timestamp given by the API
     is_local_timestamp = True
     ############################################################################
-    
+
     """
     Exchange gateway
     """
-    def __init__(self, 
-                 api_socket, 
+    def __init__(self,
+                 api_socket,
                  db_clients=[]):
         """
         Constructor
@@ -48,7 +48,7 @@ class ExchangeGateway:
         """
         return 'exch_' + exchange.lower() + '_' + instmt_name.lower() + \
                '_snapshot_' + datetime.utcnow().strftime("%Y%m%d")
-        
+
     @classmethod
     def get_snapshot_table_name(cls):
         return 'exchanges_snapshot'
@@ -68,7 +68,7 @@ class ExchangeGateway:
                              Snapshot.columns(),
                              Snapshot.types(),
                              [0,1])
-                             
+
     def init_instmt_snapshot_table(self, instmt):
         table_name = self.get_instmt_snapshot_table_name(instmt.get_exchange_name(),
                                                          instmt.get_instmt_name())
@@ -100,7 +100,7 @@ class ExchangeGateway:
         # If local timestamp indicator is on, assign the local timestamp again
         if self.is_local_timestamp:
             instmt.get_l2_depth().date_time = datetime.utcnow().strftime("%Y%m%d %H:%M:%S.%f")
-        
+
         # Update the snapshot
         if instmt.get_l2_depth() is not None:
             id = self.get_instmt_snapshot_id(instmt)
@@ -113,7 +113,8 @@ class ExchangeGateway:
                                                             instmt.get_instmt_name(),
                                                             instmt.get_l2_depth(),
                                                             Trade() if instmt.get_last_trade() is None else instmt.get_last_trade(),
-                                                            Snapshot.UpdateType.ORDER_BOOK),
+                                                            Snapshot.UpdateType.ORDER_BOOK,
+                                                            instmt.invert_pair),
                                      primary_key_index=[0,1],
                                      is_orreplace=True,
                                      is_commit=True)
@@ -127,7 +128,8 @@ class ExchangeGateway:
                                                                  '',
                                                                  instmt.get_l2_depth(),
                                                                  Trade() if instmt.get_last_trade() is None else instmt.get_last_trade(),
-                                                                 Snapshot.UpdateType.ORDER_BOOK),
+                                                                 Snapshot.UpdateType.ORDER_BOOK,
+                                                                 instmt.invert_pair),
                                           is_commit=True)
 
     def insert_trade(self, instmt, trade):
@@ -138,11 +140,11 @@ class ExchangeGateway:
         # If the instrument is not recovered, skip inserting into the table
         if not instmt.get_recovered():
             return
-        
+
         # If local timestamp indicator is on, assign the local timestamp again
         if self.is_local_timestamp:
             trade.date_time = datetime.utcnow().strftime("%Y%m%d %H:%M:%S.%f")
-        
+
         # Set the last trade to the current one
         instmt.set_last_trade(trade)
 
@@ -160,7 +162,8 @@ class ExchangeGateway:
                                                             instmt.get_instmt_name(),
                                                             instmt.get_l2_depth(),
                                                             instmt.get_last_trade(),
-                                                            Snapshot.UpdateType.TRADES),
+                                                            Snapshot.UpdateType.TRADES,
+                                                            instmt.invert_pair),
                                      types=Snapshot.types(),
                                      primary_key_index=[0,1],
                                      is_orreplace=True,
@@ -175,5 +178,6 @@ class ExchangeGateway:
                                                          '',
                                                          instmt.get_l2_depth(),
                                                          instmt.get_last_trade(),
-                                                         Snapshot.UpdateType.TRADES),
+                                                         Snapshot.UpdateType.TRADES,
+                                                         instmt.invert_pair),
                                      is_commit=True)

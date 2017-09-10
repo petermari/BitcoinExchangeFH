@@ -209,7 +209,7 @@ class Snapshot(MarketDataBase):
         """
         MarketDataBase.__init__(self)
 
-    @staticmethod        
+    @staticmethod
     def columns(is_name=True):
         """
         Return static columns names
@@ -246,19 +246,24 @@ class Snapshot(MarketDataBase):
                    ['decimal(20,8)'] * 10 + \
                    ['varchar(25)', 'varchar(25)', 'int']
 
-                
+
     @staticmethod
-    def values(exchange_name='', instmt_name='', l2_depth=None, last_trade=None, update_type=UpdateType.NONE):
+    def values(exchange_name, instmt_name, l2_depth, last_trade, update_type, invert_price):
         """
         Return values in a list
         """
         assert l2_depth is not None and last_trade is not None, "L2 depth and last trade must not be none."
-        return ([exchange_name] if exchange_name else []) + \
-               ([instmt_name] if instmt_name else []) + \
-               [last_trade.trade_price, last_trade.trade_volume] + \
-               [b.price for b in l2_depth.bids[0:5]] + \
-               [a.price for a in l2_depth.asks[0:5]] + \
-               [b.volume for b in l2_depth.bids[0:5]] + \
+        rv = ([exchange_name] if exchange_name else []) + ([instmt_name] if instmt_name else [])
+        if invert_price is 0:
+            rv += [last_trade.trade_price, last_trade.trade_volume] + \
+                  [b.price for b in l2_depth.bids[0:5]] + \
+                  [a.price for a in l2_depth.asks[0:5]]
+        else:
+            rv += [1.0 / last_trade.trade_price if last_trade.trade_price > 0 else 0.0, last_trade.trade_volume] + \
+                  [1.0 / b.price if b.price > 0.0 else 0.0 for b in l2_depth.bids[0:5]] + \
+                  [1.0 / a.price if a.price > 0.0 else 0.0 for a in l2_depth.asks[0:5]]
+
+        rv +=  [b.volume for b in l2_depth.bids[0:5]] + \
                [a.volume for a in l2_depth.asks[0:5]] + \
                [l2_depth.date_time, last_trade.date_time, update_type]
-        
+        return rv
