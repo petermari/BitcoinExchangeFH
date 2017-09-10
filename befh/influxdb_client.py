@@ -13,8 +13,9 @@ class InfluxDbClient(DatabaseClient):
     """
     InfluxDb client
     """
-    column_time_name = "order_date_time"
-    column_ignore = [ "trades_date_time", "id" ]
+    column_time_name = "trades_date_time"
+    column_update_type = "update_type"
+    column_ignore = [ "trades_date_time", "id", "order_date_time" ]
 
     @classmethod
     def replace_keyword(cls):
@@ -141,10 +142,11 @@ class InfluxDbClient(DatabaseClient):
                           e.g. [0] means the first column is the primary key
         :param is_orreplace: Indicate if the query is "INSERT OR REPLACE"
         """
-        if "exchanges_snapsh" in table:
+        if is_orreplace:
+            # skip snaphosts
             return True
-        else:
-            exchange_name, tick = self.split_table_name(table)
+
+        exchange_name, tick = self.split_table_name(table)
 
         if len(columns) != len(values):
             return False
@@ -155,7 +157,13 @@ class InfluxDbClient(DatabaseClient):
         for i in range(0, len(columns)):
             if columns[i] in self.column_time_name:
                 idata["time"] = int(self.time_to_unix(values[i]))
-            elif columns[i] in self.column_ignore:
+
+            # store only trades (skip orders)
+            if self.column_update_type in columns[i]:
+                if int(values[i]) is not 2:
+                    return True
+
+            if columns[i] in self.column_ignore:
                 continue
             else:
                 if "int" in types[i]:
@@ -169,10 +177,6 @@ class InfluxDbClient(DatabaseClient):
                     return True
 
         idata["fields"] = fields
-
-        if is_orreplace:
-            Logger.error(self.__class__.__name__, "OR replace is not supported")
-            return True
 
         self.q.put(idata)
         return True
